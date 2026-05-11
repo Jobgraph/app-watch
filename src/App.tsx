@@ -22,6 +22,7 @@ export default function App() {
   const [input, setInput] = useState('');
   const [result, setResult] = useState<Signal[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { loadConfig().then(setConfig); }, []);
   if (!config) return null;
@@ -29,6 +30,7 @@ export default function App() {
   async function analyse() {
     setLoading(true);
     setResult(null);
+    setError('');
     try {
       if (config!.deploymentId === 'local') {
         await new Promise((r) => setTimeout(r, 1500));
@@ -38,11 +40,13 @@ export default function App() {
           `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'watch' }) }
         );
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
         const data = await res.json();
-        setResult(data.signals);
+        setResult(data.signals ?? []);
       }
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally { setLoading(false); }
   }
 
   return (
@@ -62,7 +66,10 @@ export default function App() {
         <button onClick={analyse} disabled={loading || !input.trim()} style={{ backgroundColor: config.brandColour }} className="px-6 py-2.5 rounded-lg font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
           {loading ? 'Analysing...' : 'Analyse data'}
         </button>
-        {result && (
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">{error}</div>
+        )}
+        {result && result.length > 0 && (
           <div className="space-y-4 pt-4">
             {result.map((signal, i) => (
               <section key={i} className="bg-white/5 border border-white/10 rounded-lg p-5">
