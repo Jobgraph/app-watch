@@ -8,13 +8,6 @@ interface Signal {
   action: string;
 }
 
-const MOCK_RESPONSE: Signal[] = [
-  { severity: 'high', title: 'Revenue drop detected', detail: 'Weekly revenue down 23% vs. previous 4-week average (£18.2k → £14.0k)', action: 'Review pricing changes deployed last Tuesday; check conversion funnel for drop-off' },
-  { severity: 'high', title: 'Churn spike', detail: '12 cancellations this week vs. typical 3-4. Cluster: all Enterprise tier.', action: 'Urgent: reach out to churned accounts for exit interviews; check recent Enterprise feature changes' },
-  { severity: 'medium', title: 'Support ticket volume rising', detail: '47 tickets this week (+65%). Top category: "billing issues" (18 tickets)', action: 'Investigate billing system; consider proactive comms to affected users' },
-  { severity: 'low', title: 'New sign-ups steady', detail: '34 new trials this week (within normal range of 28-40)', action: 'No action needed — monitor for trend changes' },
-];
-
 const severityColour = { high: '#ef4444', medium: '#f59e0b', low: '#22c55e' };
 
 export default function App() {
@@ -27,23 +20,30 @@ export default function App() {
   useEffect(() => { loadConfig().then(setConfig); }, []);
   if (!config) return null;
 
+  if (!config.isConfigured) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="text-center max-w-md space-y-4">
+          <h1 className="text-2xl font-semibold">{config.appName}</h1>
+          <p className="text-white/60">This app is not configured. Deploy it from Jobgraph to get started.</p>
+          <a href="https://app.jobgraph.com" className="inline-block px-4 py-2 bg-indigo-600 rounded-lg text-white hover:bg-indigo-500 transition-colors">Go to Jobgraph</a>
+        </div>
+      </div>
+    );
+  }
+
   async function analyse() {
     setLoading(true);
     setResult(null);
     setError('');
     try {
-      if (config!.deploymentId === 'local') {
-        await new Promise((r) => setTimeout(r, 1500));
-        setResult(MOCK_RESPONSE);
-      } else {
-        const res = await fetch(
-          `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'watch' }) }
-        );
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        const data = await res.json();
-        setResult(data.signals ?? []);
-      }
+      const res = await fetch(
+        `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'watch' }) }
+      );
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      setResult(data.signals ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally { setLoading(false); }
