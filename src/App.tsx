@@ -8,13 +8,6 @@ interface Signal {
   action: string;
 }
 
-const MOCK_RESPONSE: Signal[] = [
-  { severity: 'high', title: 'Revenue drop detected', detail: 'Weekly revenue down 23% vs. previous 4-week average (£18.2k → £14.0k)', action: 'Review pricing changes deployed last Tuesday; check conversion funnel for drop-off' },
-  { severity: 'high', title: 'Churn spike', detail: '12 cancellations this week vs. typical 3-4. Cluster: all Enterprise tier.', action: 'Urgent: reach out to churned accounts for exit interviews; check recent Enterprise feature changes' },
-  { severity: 'medium', title: 'Support ticket volume rising', detail: '47 tickets this week (+65%). Top category: "billing issues" (18 tickets)', action: 'Investigate billing system; consider proactive comms to affected users' },
-  { severity: 'low', title: 'New sign-ups steady', detail: '34 new trials this week (within normal range of 28-40)', action: 'No action needed — monitor for trend changes' },
-];
-
 const severityColour = { high: '#ef4444', medium: '#f59e0b', low: '#22c55e' };
 
 export default function App() {
@@ -22,27 +15,38 @@ export default function App() {
   const [input, setInput] = useState('');
   const [result, setResult] = useState<Signal[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { loadConfig().then(setConfig); }, []);
   if (!config) return null;
 
+  if (!config.isConfigured) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="text-center max-w-md space-y-4">
+          <h1 className="text-2xl font-semibold">{config.appName}</h1>
+          <p className="text-white/60">This app is not configured. Deploy it from Jobgraph to get started.</p>
+          <a href="https://app.jobgraph.com" className="inline-block px-4 py-2 bg-indigo-600 rounded-lg text-white hover:bg-indigo-500 transition-colors">Go to Jobgraph</a>
+        </div>
+      </div>
+    );
+  }
+
   async function analyse() {
     setLoading(true);
     setResult(null);
+    setError('');
     try {
-      if (config!.deploymentId === 'local') {
-        await new Promise((r) => setTimeout(r, 1500));
-        setResult(MOCK_RESPONSE);
-      } else {
-        const res = await fetch(
-          `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'watch' }) }
-        );
-        const data = await res.json();
-        setResult(data.signals);
-      }
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+      const res = await fetch(
+        `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'watch' }) }
+      );
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      setResult(data.signals ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally { setLoading(false); }
   }
 
   return (
@@ -62,7 +66,13 @@ export default function App() {
         <button onClick={analyse} disabled={loading || !input.trim()} style={{ backgroundColor: config.brandColour }} className="px-6 py-2.5 rounded-lg font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
           {loading ? 'Analysing...' : 'Analyse data'}
         </button>
-        {result && (
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">{error}</div>
+        )}
+        {result && result.length === 0 && (
+          <p className="text-white/50 text-center py-8">No signals detected in this data.</p>
+        )}
+        {result && result.length > 0 && (
           <div className="space-y-4 pt-4">
             {result.map((signal, i) => (
               <section key={i} className="bg-white/5 border border-white/10 rounded-lg p-5">
