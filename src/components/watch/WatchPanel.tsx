@@ -98,6 +98,10 @@ export function WatchPanel({
       setInput(activeEntry.input);
       setAnalysisType(activeEntry.analysisType);
       setFilter('all');
+    } else {
+      setInput('');
+      setAnalysisType('performance-review');
+      setFilter('all');
     }
   }, [activeEntry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
