@@ -11,6 +11,7 @@ import {
   clearHistory,
 } from './lib/history';
 import { getMockAnalysis } from './lib/mock';
+import { processInput, parseWatchResult } from './lib/api';
 import { AppShell } from './components/shell/AppShell';
 import { WatchPanel } from './components/watch/WatchPanel';
 import { Loader2 } from 'lucide-react';
@@ -78,14 +79,27 @@ export default function App() {
       setAnalysisLoading(true);
 
       try {
-        // Simulate processing time
-        await new Promise((r) => setTimeout(r, 1200));
-        const result = getMockAnalysis(input, analysisType);
+        let result: import('./lib/types').WatchResult;
+
+        if (config.isConfigured && config.deploymentId !== 'local') {
+          const response = await processInput(config, input);
+          result = parseWatchResult(response, analysisType);
+        } else {
+          // Local dev fallback — simulate latency + use mock data
+          await new Promise((r) => setTimeout(r, 1200));
+          result = getMockAnalysis(input, analysisType);
+        }
+
         const updated = updateEntry(id, { result, status: 'complete' });
         setEntries(updated);
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'An unexpected error occurred';
+        let message = 'An unexpected error occurred';
+        if (err instanceof Error) {
+          message =
+            err.message === 'RATE_LIMITED'
+              ? 'Too many requests — please wait a moment and try again.'
+              : err.message;
+        }
         const updated = updateEntry(id, {
           status: 'error',
           errorMessage: message,
@@ -95,7 +109,7 @@ export default function App() {
         setAnalysisLoading(false);
       }
     },
-    [],
+    [config],
   );
 
   /* ---------------------------------------------------------------- */
